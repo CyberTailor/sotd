@@ -1,0 +1,12 @@
+# This file is read by sotd.py(1) to evaluate what servers are enabled and by
+# sotd_submission.py(1) to perform email-based "authentification".
+#
+# The format of this file is line-based, with two whitespace-separated values:
+# email address and directory name. Wildcard glob(7) patterns in email adresses
+# are expanded.
+#
+# Comments and blank lines are skipped.
+# Use null@localhost if you don't know author's email address.
+
+example@example.com	example-com
+*@example.org		example-org

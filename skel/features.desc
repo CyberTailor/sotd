@@ -1,0 +1,8 @@
+# short name	# pretty name
+
+gencert		Automatic TLS certificate generation
+vhost		Virtual Host support
+userdirs	Public User Directories support
+cgi		CGI support
+scgi		SCGI support
+fastcgi		FastCGI support

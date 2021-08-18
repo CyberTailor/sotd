@@ -141,5 +141,13 @@ def sotd_random() -> None:
     directory = random.choice([x for x in app.dataroot.iterdir() if x.is_dir()])
     display_server_page(directory)
 
+@app.route("/")
+def sotd() -> None:
+    """ Page that changes once a day """
+    # a bit of personalization C:
+    favorite_number = float(os.getenv("FAVORITE_NUMBER", default="0"))
+    random.seed(date.today().toordinal() + favorite_number)
+    sotd_random()
+
 if __name__ == "__main__":
     app.exec()

@@ -54,6 +54,33 @@ def display_file(path: Path, format_str="{0}", fallback=None) -> None:
     print(format_str.format(path.read_text().strip()), end="\n\n")
 
 
+def display_lang(dirname: str) -> None:
+    lang_glob = tuple(dirname.glob("lang_*"))
+    if not lang_glob:
+        return
+
+    lang_short = lang_glob[0].name.split("lang_", maxsplit=1)[-1]
+    lang_desc = app.lang_desc.get(lang_short, lang_short)
+    print("> Written in", lang_desc, end="\n\n")
+
+
+def display_features(dirname: str) -> None:
+    features = (file.name.split("feature_")[-1]
+                for file in dirname.glob("feature_*"))
+
+    did_header = False
+    # iterate over app.features_desc to keep desired order
+    for feature_short, feature_desc in app.features_desc.items():
+        if feature_short in features:
+            if not did_header:
+                print("Features:")
+            print("*", feature_desc)
+            did_header = True
+
+    if did_header:
+        print()
+
+
 def display_server_page(directory: Path) -> None:
     if not is_enabled(directory):
         failure("Untrusted server info")
@@ -64,8 +91,10 @@ def display_server_page(directory: Path) -> None:
     display_file(directory / "logo", format_str="```ASCII Art\n{0}\n```")
     display_file(directory / "name", format_str="## {0}",
                  fallback=directory.name)
+    display_lang(directory)
     display_file(directory / "description")
     display_file(directory / "homepage", format_str="🏠 Homepage:\n=> {0}")
+    display_features(directory)
     display_file(directory / "repology",
                  format_str="=> {0} 📦 Repology: packaging status")
 
@@ -97,6 +126,14 @@ class CGIHandler:
 
         return dataroot
 
+    @cached_property
+    def features_desc(self) -> OrderedDict[str, str]:
+        return self._parse_keyvals("features.desc")
+
+    @cached_property
+    def lang_desc(self) -> OrderedDict[str, str]:
+        return self._parse_keyvals("lang.desc")
+
     def route(self, glob: str):
         def decorator(f):
             self.routes[glob] = f
@@ -110,6 +147,21 @@ class CGIHandler:
                 return view_function()
 
         notfound("Here be aliens...")
+
+    def _parse_keyvals(self, filename: str) -> OrderedDict[str, str]:
+        d = OrderedDict()
+        path = self.dataroot / filename
+        for line in path.open():
+            line = line.strip()
+            if line.startswith("#") or not line:
+                continue
+
+            key, *val = line.split(maxsplit=1)
+            if not val:
+                val = [key.capitalize()]
+            d[key] = val[0]
+
+        return d
 
 
 app = CGIHandler()

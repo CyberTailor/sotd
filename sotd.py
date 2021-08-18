@@ -17,18 +17,18 @@ from pathlib import Path
 from typing import NoReturn
 
 
-def notfound() -> NoReturn:
-    print("51 Not found!\r")
+def notfound(msg="Not found!") -> NoReturn:
+    print(f"51 {msg}\r")
     sys.exit(0)
 
 
-def cgi_error(msg=None) -> NoReturn:
-    print("42 {0}\r".format(msg or "CGI Error"))
+def cgi_error(msg="CGI Error") -> NoReturn:
+    print(f"42 {msg}\r")
     sys.exit(0)
 
 
-def failure(msg=None) -> NoReturn:
-    print("40 {0}\r".format(msg or "Temporary failure!"))
+def failure(msg="Temporary failure!") -> NoReturn:
+    print(f"40 {msg}\r")
     sys.exit(0)
 
 
@@ -44,6 +44,15 @@ def is_enabled(directory: Path) -> bool:
     return False
 
 
+def display_file(path: Path, format_str="{0}", fallback=None) -> None:
+    if not path.is_file() or not os.access(path, os.R_OK):
+        if fallback is not None:
+            print(format_str.format(fallback), end="\n\n")
+        return
+
+    print(format_str.format(path.read_text().strip()), end="\n\n")
+
+
 def display_server_page(directory: Path) -> None:
     if not is_enabled(directory):
         failure("Untrusted server info")
@@ -51,7 +60,13 @@ def display_server_page(directory: Path) -> None:
     print("20 text/gemini\r")
     print("# Gemini Server of the Day is ...")
 
-    print("##", directory.name)
+    display_file(directory / "logo", format_str="```ASCII Art\n{0}\n```")
+    display_file(directory / "name", format_str="## {0}",
+                 fallback=directory.name)
+    display_file(directory / "description")
+    display_file(directory / "homepage", format_str="🏠 Homepage:\n=> {0}")
+    display_file(directory / "repology",
+                 format_str="=> {0} 📦 Repology: packaging status")
 
     print("--", end="\n\n")
     print("=> random 🔀 Random server")
@@ -93,7 +108,7 @@ class CGIHandler:
             if fnmatch(self.path, glob):
                 return view_function()
 
-        notfound()
+        notfound("Here be aliens...")
 
 
 app = CGIHandler()
@@ -101,8 +116,7 @@ app = CGIHandler()
 @app.route("/random")
 def sotd_random() -> None:
     """ Page that changes on every requst """
-    directory = random.choice(filter(lambda x: x.is_dir(),
-                                     app.dataroot.iterdir()))
+    directory = random.choice([x for x in app.dataroot.iterdir() if x.is_dir()])
     display_server_page(directory)
 
 if __name__ == "__main__":

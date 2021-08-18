@@ -1,0 +1,6 @@
+*.py[cod]
+*.swp
+*~
+__pycache__/
+cgi-bin/
+info/

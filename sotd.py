@@ -4,6 +4,7 @@
 # SPDX-FileCopyrightText: 2021 Anna <cyber@sysrq.in>
 # No warranty.
 
+import mimetypes
 import os
 import random
 import sys
@@ -17,11 +18,9 @@ from functools import cached_property
 from pathlib import Path
 from typing import NoReturn
 
-
-def notfound(msg="Not found!") -> NoReturn:
-    print(f"51 {msg}\r")
+def redirect(url: str) -> NoReturn:
+    print(f"31 {url}\r")
     sys.exit(0)
-
 
 def cgi_error(msg="CGI Error") -> NoReturn:
     print(f"42 {msg}\r")
@@ -30,6 +29,16 @@ def cgi_error(msg="CGI Error") -> NoReturn:
 
 def failure(msg="Temporary failure!") -> NoReturn:
     print(f"40 {msg}\r")
+    sys.exit(0)
+
+
+def permanent_failure(msg="Access denied!") -> NoReturn:
+    print(f"50 {msg}\r")
+    sys.exit(0)
+
+
+def notfound(msg="Not found!") -> NoReturn:
+    print(f"51 {msg}\r")
     sys.exit(0)
 
 
@@ -200,6 +209,39 @@ def sotd() -> None:
     favorite_number = float(os.getenv("FAVORITE_NUMBER", default="0"))
     random.seed(date.today().toordinal() + favorite_number)
     sotd_random()
+
+@app.route("/info/registry")
+def sotd_registry() -> None:
+    """ Should be kept private (contains email addresses) """
+    permanent_failure()
+
+@app.route("/info")
+@app.route("/info/*")
+def sotd_info() -> None:
+    """ Serve info files """
+    path = app.dataroot / Path(app.path).relative_to("/info")
+    if not path.exists():
+        notfound()
+    if not path.is_relative_to(app.dataroot):
+        permanent_failure()
+
+    if path.is_file():
+        mimetypes.add_type("text/gemini", ".gmi")
+        mimetypes.add_type("text/gemini", ".gemini")
+        print("20", mimetypes.guess_type(path, strict=False)[0] or "text/plain",
+              end="\r\n")
+        print(path.read_text())
+    elif path.is_dir():
+        if not app.path.endswith("/"):
+            redirect(app.path + "/")
+
+        print("20 text/gemini\r")
+        print("# Index of", app.path, end="\n\n")
+        print("=> ..")
+        for item in path.iterdir():
+            print("=>", item.name, end="/\n" if item.is_dir() else "\n")
+    else:
+        failure("Cannot display a file")
 
 if __name__ == "__main__":
     app.exec()

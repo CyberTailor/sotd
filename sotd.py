@@ -58,7 +58,7 @@ def display_file(path: Path, format_str="{0}", fallback=None) -> None:
             print(format_str.format(fallback), end="\n\n")
         return
 
-    print(format_str.format(path.read_text().strip()), end="\n\n")
+    print(format_str.format(path.read_text().rstrip()), end="\n\n")
 
 
 def display_lang(dirname: str) -> None:

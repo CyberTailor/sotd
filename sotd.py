@@ -16,30 +16,28 @@ from datetime import date
 from fnmatch import fnmatch
 from functools import cached_property
 from pathlib import Path
-from typing import NoReturn
-
-def redirect(url: str) -> NoReturn:
-    print(f"31 {url}\r")
-    sys.exit(0)
-
-def cgi_error(msg="CGI Error") -> NoReturn:
-    print(f"42 {msg}\r")
-    sys.exit(0)
 
 
-def failure(msg="Temporary failure!") -> NoReturn:
-    print(f"40 {msg}\r")
-    sys.exit(0)
+class Redirect(Exception):
+    def __init__(self, url: str):
+        super().__init__()
+        self.url: str = url
 
 
-def permanent_failure(msg="Access denied!") -> NoReturn:
-    print(f"50 {msg}\r")
-    sys.exit(0)
+class Failure(RuntimeError):
+    pass
 
 
-def notfound(msg="Not found!") -> NoReturn:
-    print(f"51 {msg}\r")
-    sys.exit(0)
+class CGIError(RuntimeError):
+    pass
+
+
+class PermanentFailure(RuntimeError):
+    pass
+
+
+class NotFound(RuntimeError):
+    pass
 
 
 def is_enabled(directory: Path) -> bool:
@@ -92,7 +90,7 @@ def display_features(dirname: str) -> None:
 
 def display_server_page(directory: Path) -> None:
     if not is_enabled(directory):
-        failure("Untrusted server info")
+        raise Failure("Server info came from a non-authorized source")
 
     print("20 text/gemini\r")
     print("# Gemini Server of the Day is ...")
@@ -123,6 +121,10 @@ class CGIHandler:
         return urllib.parse.unquote(path_info) or "/"
 
     @cached_property
+    def script_name(self) -> str:
+        return os.getenv("SCRIPT_NAME", default="")
+
+    @cached_property
     def dataroot(self) -> Path:
         dataroot_env = os.getenv("SOTD_DATAROOT")
         if dataroot_env:
@@ -131,7 +133,7 @@ class CGIHandler:
             dataroot = Path.cwd().parent / "info"
 
         if not dataroot.is_dir():
-            cgi_error("Invalid SOTD_DATAROOT")
+            raise CGIError("Invalid SOTD_DATAROOT")
 
         return dataroot
 
@@ -155,7 +157,7 @@ class CGIHandler:
             if fnmatch(self.path, glob):
                 return view_function()
 
-        notfound("Here be aliens...")
+        raise NotFound("UFO landed and left these words here")
 
     def _parse_keyvals(self, filename: str) -> OrderedDict[str, str]:
         d = OrderedDict()
@@ -220,7 +222,7 @@ def sotd_robots() -> None:
 @app.route("/info/registry")
 def sotd_registry() -> None:
     """ Should be kept private (contains email addresses) """
-    permanent_failure()
+    raise PermanentFailure("Access denied")
 
 @app.route("/info")
 @app.route("/info/*")
@@ -228,9 +230,9 @@ def sotd_info() -> None:
     """ Serve info files """
     path = app.dataroot / Path(app.path).relative_to("/info")
     if not path.exists():
-        notfound()
+        raise NotFound("No such file or directory")
     if not path.is_relative_to(app.dataroot):
-        permanent_failure()
+        raise PermanentFailure("Access denied")
 
     if path.is_file():
         mimetypes.add_type("text/gemini", ".gmi")
@@ -240,7 +242,7 @@ def sotd_info() -> None:
         print(path.read_text())
     elif path.is_dir():
         if not app.path.endswith("/"):
-            redirect(app.path + "/")
+            raise Redirect(app.path + "/")
 
         print("20 text/gemini\r")
         print("# Index of", app.path, end="\n\n")
@@ -248,7 +250,20 @@ def sotd_info() -> None:
         for item in path.iterdir():
             print("=>", item.name, end="/\n" if item.is_dir() else "\n")
     else:
-        failure("Cannot display a file")
+        raise Failure("Cannot display a file")
 
 if __name__ == "__main__":
-    app.exec()
+    try:
+        app.exec()
+    except Redirect as redirect:
+        print(31, app.script_name + redirect.url, end="\r\n")
+    except Failure as err:
+        print(40, *err.args, end="\r\n")
+    except CGIError as err:
+        print(42, *err.args, end="\r\n")
+    except PermanentFailure as err:
+        print(50, *err.args, end="\r\n")
+    except NotFound as err:
+        print(51, *err.args, "\r\n")
+    except (OSError, RuntimeError, SystemError) as err:
+        raise CGIError("Internal server error") from err

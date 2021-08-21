@@ -210,6 +210,13 @@ def sotd() -> None:
     random.seed(date.today().toordinal() + favorite_number)
     sotd_random()
 
+@app.route("/robots.txt")
+def sotd_robots() -> None:
+    print("20 text/plain\r")
+    print("User-agent: indexer")
+    print(f"Disallow: {app.script_name}/info")
+    print(f"Disallow: {app.script_name}/server_info.tar.gz")
+
 @app.route("/info/registry")
 def sotd_registry() -> None:
     """ Should be kept private (contains email addresses) """

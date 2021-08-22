@@ -1,0 +1,1 @@
+> This is a public log file for server submissions. It is not truncated automatically, so you need to use logrotate (see "misc" directory in the source tree).

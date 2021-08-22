@@ -35,9 +35,10 @@ install-cgi:
 	-$(PYTHON) -OO -m compileall -f -d $(CGIDIR)/cgi-bin $(DESTDIR)$(CGIDIR)/cgi-bin
 
 install-info:
-	mkdir -p $(DESTDIR)$(CGIDIR)/info
+	$(INSTALL_CGI) -d $(DESTDIR)$(CGIDIR)/info
 	$(INSTALL_CGI_DATA) skel/lang.desc $(DESTDIR)$(CGIDIR)/info
 	$(INSTALL_CGI_DATA) skel/features.desc $(DESTDIR)$(CGIDIR)/info
 	$(INSTALL_CGI_DATA) skel/registry $(DESTDIR)$(CGIDIR)/info
+	$(INSTALL_CGI_DATA) skel/log.gmi $(DESTDIR)$(CGIDIR)/info
 
 .PHONY: help install install-cgi install-info

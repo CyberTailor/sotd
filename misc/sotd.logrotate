@@ -1,0 +1,7 @@
+# /etc/logrotate.d/sotd
+
+/var/gemini/sotd/info/log.gmi {
+	su gemini gemini
+	notifempty
+	missingok
+}

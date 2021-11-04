@@ -8,6 +8,7 @@ import mimetypes
 import os
 import random
 import sys
+import sqlite3
 import tarfile
 import urllib.parse
 
@@ -40,47 +41,51 @@ class NotFound(RuntimeError):
     pass
 
 
-def is_enabled(directory: Path) -> bool:
-    registry = directory.parent / "registry"
+def is_enabled(name: str) -> bool:
+    registry = app.dataroot / "registry"
     for line in registry.open():
         line = line.strip()
         if line.startswith("#") or not line:
             continue
-        if directory.name == line.split()[-1]:
+        if name == line.split()[-1]:  # matching entry found
             return True
 
     return False
 
 
-def display_file(path: Path, format_str="{0}", fallback=None) -> None:
-    if not path.is_file() or not os.access(path, os.R_OK):
-        if fallback is not None:
-            print(format_str.format(fallback), end="\n\n")
-        return
+def display_server_page(data, lang, feature_desc) -> None:
+    def display(field: str, format_str="{0}", fallback=None):
+        val = data[field] or fallback
+        if val is not None:
+            print(format_str.format(val), end="\n\n")
 
-    print(format_str.format(path.read_text().rstrip()), end="\n\n")
+    def display_lang():
+        if lang is not None:
+            print("> Written in", lang.strip(), end="\n\n")
 
-
-def display_server_page(directory: Path) -> None:
-    if not is_enabled(directory):
-        raise Failure("Server info came from non-authorized source")
+    def display_features():
+        if not feature_desc:
+            return
+        print("Features:")
+        for feature in feature_desc:
+            print("*", feature)
+        print()
 
     print("20 text/gemini\r")
     print("# Gemini Server of the Day is ...")
 
-    display_file(directory / "logo", format_str="```ASCII Art\n{0}\n```")
-    display_file(directory / "name", format_str="## {0}",
-                 fallback=directory.name)
-    # display_lang(directory)
-    display_file(directory / "description")
-    display_file(directory / "homepage", format_str="🏠 Homepage:\n=> {0}")
-    # display_features(directory)
-    display_file(directory / "repology",
-                 format_str="=> {0} 📦 Repology: packaging status")
+    display("logo", format_str="```ASCII Art\n{0}\n```")
+    display("screen_name", format_str="## {0}", fallback=data["name"])
+    display_lang()
+    display("description")
+    display("homepage", format_str="🏠 Homepage:\n=> {0}")
+    display_features()
+    display("repology", format_str="=> {0} 📦 Repology: packaging status")
 
     print("--", end="\n\n")
-    print("=> random 🔀 Random server")
-    print("=> info/README.gmi ℹ️ About this thing")
+    print(f"=> ./{data['name']} ⚓ Permanent link to this page")
+    print("=> ./random 🔀 Random server")
+    print("=> ./info/README.gmi ℹ️ About this thing")
 
 
 class CGIHandler:
@@ -148,20 +153,6 @@ def sotd_dump() -> None:
     with tarfile.open(fileobj=sys.stdout.buffer, mode="w|gz") as tar:
         tar.add(app.dataroot, arcname="", filter=info_filter)
 
-@app.route("/random")
-def sotd_random() -> None:
-    """ Page that changes on every requst """
-    directory = random.choice([x for x in app.dataroot.iterdir() if x.is_dir()])
-    display_server_page(directory)
-
-@app.route("/")
-def sotd() -> None:
-    """ Page that changes once a day """
-    # a bit of personalization C:
-    favorite_number = float(os.getenv("FAVORITE_NUMBER", default="0"))
-    random.seed(date.today().toordinal() + favorite_number)
-    sotd_random()
-
 @app.route("/robots.txt")
 def sotd_robots() -> None:
     print("20 text/plain\r")
@@ -200,13 +191,71 @@ def sotd_info() -> None:
         for item in path.iterdir():
             print("=>", item.name, end="/\n" if item.is_dir() else "\n")
     else:
-        raise Failure("Cannot display a file")
+        raise Failure("Cannot display this file")
+
+@app.route("/")
+def sotd() -> None:
+    """ Page that changes once a day """
+    # a bit of personalization C:
+    favorite_number = float(os.getenv("FAVORITE_NUMBER", default="0"))
+    random.seed(date.today().toordinal() + favorite_number)
+    sotd_random()
+
+@app.route("/random")
+def sotd_random() -> None:
+    """ Page that changes on every requst """
+    sotd_server_page(is_random=True)
+
+@app.route("/*")
+def sotd_server_page(is_random: bool = False) -> None:
+    """ Server info page """
+    if len(Path(app.path).parts) > 2:
+        raise NotFound("UFO landed and left these words here")
+
+    con = sqlite3.connect(app.dataroot / "sotd.db")
+    con.row_factory = sqlite3.Row
+    cur = con.cursor()
+
+    if is_random:
+        cur.execute("SELECT * FROM servers")
+        data = random.choice(cur.fetchall())
+    else:
+        cur.execute("SELECT * FROM servers "
+                    "WHERE name=?", (Path(app.path).parts[1],))
+        data = cur.fetchone()
+        if data is None:
+            raise NotFound("No server info found")
+
+    if not is_enabled(data["name"]):
+        raise Failure("Server info came from non-authorized source")
+
+    lang_name = None
+    if data["lang"] is not None:
+        cur.execute("SELECT screen_name FROM languages "
+                    "WHERE name=?", (data["lang"],))
+        lang = cur.fetchone()
+        if lang is not None:
+            lang_name = lang["screen_name"] or data["lang"].capitalize()
+
+    cur.execute("SELECT feature_name FROM server_features "
+                "WHERE server_name=?", (data["name"],))
+    features = [row["feature_name"] for row in cur]
+    feature_desc = []
+    for feat in features:
+        cur.execute("SELECT description FROM features WHERE name=?", (feat,))
+        desc = cur.fetchone()
+        if desc is not None:
+            feature_desc.append(desc["description"] or feat)
+
+    con.close()
+
+    display_server_page(data, lang_name, feature_desc or None)
 
 if __name__ == "__main__":
     try:
         app.exec()
     except Redirect as redirect:
-        print(31, app.script_name + redirect.url, end="\r\n")
+        print(31, redirect.url, end="\r\n")
     except Failure as err:
         print(40, *err.args, end="\r\n")
     except CGIError as err:
@@ -215,5 +264,5 @@ if __name__ == "__main__":
         print(50, *err.args, end="\r\n")
     except NotFound as err:
         print(51, *err.args, "\r\n")
-    except (OSError, RuntimeError, SystemError) as err:
+    except (OSError, RuntimeError, SystemError, sqlite3.Error) as err:
         raise CGIError("Internal server error") from err

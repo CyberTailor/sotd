@@ -17,9 +17,8 @@ help:
 	@echo  'targets:'
 	@echo  'install-bot	- Install sotd_sumbission.py email bot'
 	@echo  'install-cgi	- Install sotd.py to $(CGIDIR)/cgi-bin'
-	@echo  'intall		- Run the former two targets'
-	@echo  'install-info	- Copy files from skel/ to $(CGIDIR)/info'
-	@echo  '		  Run this only when installing the first time!'
+	@echo  'install		- Run the former two targets'
+	@echo  'install-db	- Install empty sotd.db database to $(CGIDIR)'
 
 install: install-bot install-cgi
 
@@ -34,11 +33,12 @@ install-cgi:
 	-$(PYTHON) -O -m compileall -q -f -d $(CGIDIR)/cgi-bin $(DESTDIR)$(CGIDIR)/cgi-bin
 	-$(PYTHON) -OO -m compileall -f -d $(CGIDIR)/cgi-bin $(DESTDIR)$(CGIDIR)/cgi-bin
 
-install-info:
+install-db:
+	rm -f sotd.db
+	sqlite3 sotd.db <create_db.sql
 	$(INSTALL_CGI) -d $(DESTDIR)$(CGIDIR)/info
-	$(INSTALL_CGI_DATA) skel/lang.desc $(DESTDIR)$(CGIDIR)/info
-	$(INSTALL_CGI_DATA) skel/features.desc $(DESTDIR)$(CGIDIR)/info
 	$(INSTALL_CGI_DATA) skel/registry $(DESTDIR)$(CGIDIR)/info
 	$(INSTALL_CGI_DATA) skel/log.gmi $(DESTDIR)$(CGIDIR)/info
+	$(INSTALL_CGI_DATA) sotd.db $(DESTDIR)$(CGIDIR)/info
 
-.PHONY: help install install-cgi install-info
+.PHONY: help install install-cgi install-db

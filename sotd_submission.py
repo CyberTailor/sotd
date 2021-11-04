@@ -219,6 +219,40 @@ except BadInput as error:
     logger.finish(*error.args)
     sys.exit(0 if not debug else 1)
 
+@bot.command("features")
+def cmd_features() -> None:
+    logger.print("* clean", bot.cmd)
+    cursor.execute("DELETE FROM server_features WHERE server_name=?", (bot.name,))
+    if not bot.msg_contents:
+        return
+
+    cursor.execute("SELECT name FROM features")
+    allowed = {x["name"] for x in cursor.fetchall()}
+    args = set(bot.msg_contents)
+    if args-allowed != set():
+        raise BadInput(f"Invalid value(s): {args-allowed}.",
+                       "Allowed values are as follows:", str(allowed))
+
+    logger.print("* set", bot.cmd, "to", args)
+    cursor.executemany("INSERT INTO server_features(server_name, feature_name) VALUES (?, ?)",
+                       ((bot.name, feature) for feature in args))
+
+@bot.command("lang")
+def cmd_lang() -> None:
+    if not bot.msg_contents:
+        raise BadInput("Cannot be empty:", bot.cmd)
+    text = bot.msg_contents[0]  # first line
+
+    cursor.execute("SELECT name FROM languages")
+    langs = [x["name"] for x in cursor.fetchall()]
+    arg = text.split()[0]  # first word
+    if arg not in langs:
+        raise BadInput(f"Invalid value: {arg}.",
+                        "Allowed values are as follows:", str(langs))
+
+    cursor.execute(f"UPDATE servers SET '{bot.cmd}'=? "
+                    "WHERE name=?", (arg, bot.name))
+
 @bot.command("screen_name")
 def cmd_oneline(validate: Optional[Callable] = None) -> None:
     if not bot.msg_contents:

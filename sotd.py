@@ -7,9 +7,7 @@
 import mimetypes
 import os
 import random
-import sys
 import sqlite3
-import tarfile
 import urllib.parse
 
 from collections import OrderedDict
@@ -131,34 +129,6 @@ class CGIHandler:
 
 
 app = CGIHandler()
-
-@app.route("/server_info.tar.gz")
-def sotd_dump() -> None:
-    """ Generate a tarball from all info directories (excluding registry) """
-    def info_filter(tarinfo: tarfile.TarInfo):
-        if tarinfo.name == "registry":
-            return None
-
-        if tarinfo.isfile():
-            tarinfo.mode = 0o0644
-        elif tarinfo.isdir():
-            tarinfo.mode = 0o0755
-
-        tarinfo.uid = tarinfo.gid = 0
-        tarinfo.uname = tarinfo.gname = "gemini"
-        return tarinfo
-
-    print("20 application/x-gtar\r")
-    sys.stdout.flush()
-    with tarfile.open(fileobj=sys.stdout.buffer, mode="w|gz") as tar:
-        tar.add(app.dataroot, arcname="", filter=info_filter)
-
-@app.route("/robots.txt")
-def sotd_robots() -> None:
-    print("20 text/plain\r")
-    print("User-agent: indexer")
-    print(f"Disallow: {app.script_name}/info")
-    print(f"Disallow: {app.script_name}/server_info.tar.gz")
 
 @app.route("/info/registry")
 def sotd_registry() -> None:

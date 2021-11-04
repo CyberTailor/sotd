@@ -18,9 +18,14 @@ help:
 	@echo  'install-bot	- Install sotd_sumbission.py email bot'
 	@echo  'install-cgi	- Install sotd.py to $(CGIDIR)/cgi-bin'
 	@echo  'install		- Run the former two targets'
+	@echo  'user		- Add $(CGIUSER) user to the system'
 	@echo  'install-db	- Install empty sotd.db database to $(CGIDIR)'
 
 install: install-bot install-cgi
+
+user:
+	groupadd $(CGIGROUP)
+	useradd -d /var/gemini -s /sbin/nologin -u $(CGIUSER) -g $(CGIGROUP)
 
 install-bot:
 	mkdir -p $(DESTDIR)$(BINDIR)

@@ -4,11 +4,19 @@
 # SPDX-FileCopyrightText: 2021 Anna <cyber@sysrq.in>
 # No warranty.
 
+import email
+import email.parser
+import email.policy
 import os
+import sqlite3
 import sys
 import time
 
 from dataclasses import dataclass, field
+from email.errors import MessageError
+from email.headerregistry import UniqueSingleAddressHeader
+from email.message import EmailMessage
+from fnmatch import fnmatch
 from functools import cached_property
 from pathlib import Path
 from typing import Callable, Optional
@@ -72,10 +80,28 @@ class GmiLogger:
 class BotHandler:
     """ Main application logic """
 
-    def __init__(self, dataroot_: Path, logger_: GmiLogger):
+    def __init__(self, msg_: EmailMessage, dataroot_: Path, logger_: GmiLogger):
+        """
+        auth() method has to be called after creating an instance
+
+        :raises BadInput: on failed 'Subject' checks
+        """
+
         self.commands: dict = {}
         self.logger: GmiLogger = logger_
         self.dataroot: Path = dataroot_
+        self.msg: EmailMessage = msg_
+
+        if not self.msg["Subject"]:
+            raise BadInput("Error: empty subject")
+
+        self.name: str
+        self.cmd: str
+        try:
+            self.name, self.cmd = map(str.strip, self.msg["Subject"].split("/"))
+        except ValueError as err:
+            raise BadInput("Error: invalid action: '{msg[Subject]}'"
+                           .format(msg=self.msg)) from err
 
     @cached_property
     def registry(self) -> list[RegistryEntry]:
@@ -91,6 +117,51 @@ class BotHandler:
 
         return reg
 
+    @cached_property
+    def addr_from(self) -> str:
+        """ Email address parsed from the 'From:' header """
+        try:
+            dest = dict(defects=[])
+            UniqueSingleAddressHeader.parse(self.msg["From"], dest)
+
+            return dest["groups"][0].addresses[0].addr_spec
+        except (LookupError, AttributeError) as err:
+            raise BadInput("Error: invalid email address") from err
+
+    @cached_property
+    def editable_names(self) -> list[str]:
+        """ List of names, for which email address matches with glob from the registry """
+        return [entry.name for entry in self.registry
+                if entry.enabled and fnmatch(self.addr_from, entry.email_glob)]
+
+    @cached_property
+    def msg_contents(self) -> list[str]:
+        """ Message contents, split by newlines """
+        for part in self.msg.walk():
+            if part.get_content_type() not in ("text/plain", "text/gemini"):
+                continue
+            return list(filter(None, part.get_content().rstrip().split("\n")))
+
+        raise BadInput("Error: only text/plain and text/gemini MIME types "
+                       "are supported")
+
+    @cached_property
+    def is_new(self) -> bool:
+        """ True when there're no matching entries in the database """
+        cursor.execute("SELECT * FROM servers WHERE name=?", (bot.name,))
+        if cursor.fetchone() is None:
+            return True
+        return False
+
+    def auth(self) -> None:
+        if "DKIM-Signature" not in self.msg:
+            raise AuthorizationFailed("Update rejected: missing DKIM signature")
+        if "X-Spam" in self.msg:
+            raise AuthorizationFailed("Update rejected: marked as spam")
+
+        if not self.is_new and self.name not in self.editable_names:
+            raise AuthorizationFailed("Update rejected: email address mismatch")
+
     def command(self, cmd: str):
         """ Register a function as the handler for cmd """
         def decorator(f: Callable):
@@ -101,13 +172,28 @@ class BotHandler:
 
     def process(self) -> None:
         """ Find matching handler, run it and and write database """
+        self.logger.print(f"=> ../{self.name}")
+
         try:
             function = self.commands[self.cmd]
         except LookupError as err:
             raise BadInput(f"Error: unknown action: '{self.cmd}'") from err
 
+        reg_entry = RegistryEntry(self.addr_from, self.name)
+        if reg_entry not in self.registry:
+            self.logger.print("> Notice: your submission won't be displayed "
+                              "until manual verification")
+            with open(self.dataroot / "registry", "a") as file:
+                print(reg_entry, file=file)
+
+        if self.is_new:
+            self.logger.print(f"* new server: {self.name}")
+            cursor.execute("INSERT INTO servers(name) VALUES (?)", (bot.name,))
+
         function()
 
+        connection.commit()
+        connection.close()
         self.logger.finish("Success")
 
 
@@ -117,8 +203,37 @@ if len(sys.argv) > 1:
 
 logger = GmiLogger(dataroot / "log.gmi")
 
+# enable strict policy so emails with e.g. invalid 'From:'
+# headers are rejected
+parser = email.parser.Parser(policy=email.policy.strict)
 try:
-    bot = BotHandler(dataroot, logger)
+    msg = parser.parse(sys.stdin if not debug else os.fdopen(3))
+except MessageError:
+    logger.finish("Error while parsing email message")
+    sys.exit(0 if not debug else 1)
+
+try:
+    bot = BotHandler(msg, dataroot, logger)
 except BadInput as error:
     logger.finish(*error.args)
     sys.exit(0 if not debug else 1)
+
+if __name__ == "__main__":
+    connection = sqlite3.connect(dataroot / "sotd.db")
+    connection.row_factory = sqlite3.Row
+    cursor = connection.cursor()
+    # FIXME: foreign key mismatch - "server_features" referencing "servers"
+    # cursor.execute("PRAGMA foreign_keys = ON")
+
+    try:
+        bot.auth()
+        bot.process()
+    except (AuthorizationFailed, BadInput) as error:
+        logger.finish(*error.args)
+        sys.exit(0 if not debug else 1)
+    # except sqlite3.Error as error:
+        # logger.finish("SQL Error:", *error.args)
+        # sys.exit(0 if not debug else 1)
+    except (OSError, RuntimeError, SystemError):
+        logger.finish("Internal server error")
+        sys.exit(0 if not debug else 1)

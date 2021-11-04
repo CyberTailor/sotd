@@ -253,6 +253,19 @@ def cmd_repology() -> None:
 
     cmd_oneline(validate_repology)
 
+@bot.command("description")
+@bot.command("logo")
+def cmd_multiline() -> None:
+    text = "\n".join(bot.msg_contents)
+    if not text.strip():
+        text = None
+        logger.print(f"* delete {bot.cmd}")
+    else:
+        logger.print(f"* update {bot.cmd}")
+
+    cursor.execute(f"UPDATE servers SET '{bot.cmd}'=? "
+                    "WHERE name=?", (text, bot.name))
+
 if __name__ == "__main__":
     connection = sqlite3.connect(dataroot / "sotd.db")
     connection.row_factory = sqlite3.Row

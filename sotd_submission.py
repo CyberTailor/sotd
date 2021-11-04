@@ -11,6 +11,7 @@ import os
 import sqlite3
 import sys
 import time
+import urllib.parse
 
 from dataclasses import dataclass, field
 from email.errors import MessageError
@@ -217,6 +218,40 @@ try:
 except BadInput as error:
     logger.finish(*error.args)
     sys.exit(0 if not debug else 1)
+
+@bot.command("screen_name")
+def cmd_oneline(validate: Optional[Callable] = None) -> None:
+    if not bot.msg_contents:
+        logger.print(f"* delete {bot.cmd}")
+        cursor.execute(f"UPDATE servers SET {bot.cmd}=NULL "
+                        "WHERE name=?", (bot.name,))
+        return
+
+    text = bot.msg_contents[0].strip()  # first line
+    logger.print(f"* set {bot.cmd} to {text}")
+    if validate is not None:
+        validate(text)
+    cursor.execute(f"UPDATE servers SET '{bot.cmd}'=? "
+                    "WHERE name=?", (text, bot.name))
+
+def validate_url(url: str) -> urllib.parse.ParseResult:
+    u = urllib.parse.urlsplit(url)
+    if u.scheme and u.netloc:
+        return u
+    raise BadInput("Invalid URL:", url)
+
+@bot.command("homepage")
+def cmd_url() -> None:
+    cmd_oneline(validate_url)
+
+@bot.command("repology")
+def cmd_repology() -> None:
+    def validate_repology(url: str) -> None:
+        u = validate_url(url)
+        if u.netloc != "repology.org":
+            raise BadInput("Invalid repology.org URL:", url)
+
+    cmd_oneline(validate_repology)
 
 if __name__ == "__main__":
     connection = sqlite3.connect(dataroot / "sotd.db")

@@ -40,6 +40,8 @@ install-cgi:
 	-$(PYTHON) -m compileall -q -f -d $(CGIDIR)/cgi-bin $(DESTDIR)$(CGIDIR)/cgi-bin
 	-$(PYTHON) -O -m compileall -q -f -d $(CGIDIR)/cgi-bin $(DESTDIR)$(CGIDIR)/cgi-bin
 	-$(PYTHON) -OO -m compileall -f -d $(CGIDIR)/cgi-bin $(DESTDIR)$(CGIDIR)/cgi-bin
+	mkdir -p $(DESTDIR)$(MANDIR)/man8
+	$(INSTALL) -m 0644 sotd.py.8 $(DESTDIR)$(MANDIR)/man8
 
 install-db:
 	rm -f sotd.db

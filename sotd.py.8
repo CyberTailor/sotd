@@ -1,0 +1,35 @@
+.\" SPDX-FileType: DOCUMENTATION
+.\" SPDX-License-Identifier: WTFPL
+.\" SPDX-FileCopyrightText: 2021 Anna <cyber@sysrq.in>
+.Dd November 5, 2021
+.Dt SOTD.PY 8
+.Os
+.Sh NAME
+.Nm sotd.py
+.Nd CGI \(dqserver of the day\(dq program for Geminispace
+.Sh DESCRIPTION
+The
+.Nm
+CGI program displays advertising pages for Gemini servers.
+.Pp
+Server that's displayed on the main page changes every midnight in system's local timezone.
+.Sh ENVIRONMENT
+The Gemini server may pass the following CGI variables to
+.Nm :
+.Bl -tag -width Ds
+.It Ev SOTD_DATAROOT
+Directory where registry and SQLite database files are located.
+The default is
+.Pa ../info 
+.Po relative to the 
+.Nm
+script file
+.Pc .
+.It Ev FAVORITE_NUMBER
+Floating-point number to use for random seed generation.
+The default is 0.
+.El
+.Sh SEE ALSO
+.Xr sotd_submission.py 8
+.Sh AUTHORS
+.An Anna Aq Mt cyber@sysrq.in

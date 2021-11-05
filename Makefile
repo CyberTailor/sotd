@@ -1,5 +1,6 @@
 PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
+MANDIR ?= $(PREFIX)/share/man
 
 CGIDIR   ?= /var/gemini/sotd
 CGIUSER  ?= gemini
@@ -30,6 +31,8 @@ user:
 install-bot:
 	mkdir -p $(DESTDIR)$(BINDIR)
 	$(INSTALL) sotd_submission.py $(DESTDIR)$(BINDIR)
+	mkdir -p $(DESTDIR)$(MANDIR)/man8
+	$(INSTALL) -m 0644 sotd_submission.py.8 $(DESTDIR)$(MANDIR)/man8
 
 install-cgi:
 	mkdir -p $(DESTDIR)$(CGIDIR)/cgi-bin

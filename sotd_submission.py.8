@@ -1,0 +1,109 @@
+.\" SPDX-FileType: DOCUMENTATION
+.\" SPDX-License-Identifier: WTFPL
+.\" SPDX-FileCopyrightText: 2021 Anna <cyber@sysrq.in>
+.Dd November 5, 2021
+.Dt SOTD_SUBMISSION.PY 8
+.Os
+.Sh NAME
+.Nm sotd_submission.py
+.Nd email bot for submissions to the Gemini server database
+.Sh DESCRIPTION
+The
+.Nm
+program expects an RFC-correct email message on its standard input.
+It has to be DKIM-signed and is not allowed to have
+.Ql X-Spam
+header.
+.Pp
+.Ql Subject
+header is interpreted as a command consisting of two slash-separated parts.
+The first part is server's name in the database.
+The last part is the name of a column in the
+.Ql servers
+database table or some other keyword.
+.Pp
+Message body is considered as new value.
+Only
+.Ql text/plain
+and
+.Ql text/gemini
+MIME types are allowed.
+If the body is empty, corresponding database field will be cleared.
+.Pp
+The commands are as follows
+.Po Ql name
+is a variable here
+.Pc :
+.Bl -tag -width Ds
+.It Ic name/description
+Multi-line description.
+Supports Gemtext markup.
+.
+.It Ic name/features
+Newline-separated list of features.
+Replaces the existing set of features.
+Check out instance documentation for the list of valid options.
+.
+.It Ic name/homepage
+One line that has to be a valid URL, pointing to project's homepage.
+Any protocol is allowed.
+.
+.It Ic name/lang
+The main programming language that was used to write a server.
+Check out instance documentation for the list of valid options.
+.
+.It Ic name/logo
+Multi-line ASCII-art logo.
+.
+.It Ic name/repology
+One line that has to be a valid repology.org packaging status URL, e.g.\&
+.Lk https://repology.org/project/example/versions .
+.
+.It Ic name/screen_name
+Single-line name to display in the heading.
+Unnecessary if it's identical to
+.Va name .
+.El
+.Sh ENVIRONMENT
+.Nm
+uses the following environment variables:
+.Bl -tag -width Ds
+.It Ev SOTD_DATAROOT
+Directory where registry and SQLite database files are located.
+The default is
+.Pa /var/gemini/sotd/info .
+.It Ev SOTD_DEBUG
+When set, makes
+.Nm
+read mail from file descriptor 3 instead of
+.Em stdin
+and exit with code 1 on errors.
+.El
+.Sh FILES
+The
+.Nm
+program reads
+.Pa registry
+file to authorize changes to the database and writes to it when a new server is added.
+.Pp
+The format of this file is line-based, with two whitespace-separated values: email address and server name.
+Wildcard
+.Xr glob 7
+patterns in email addresses are expanded.
+Comments and blank lines are skipped.
+.Mt null@localhost
+can be used if author's email address is unknown.
+.Sh EXIT CODES
+The
+.Nm
+program exits 0 on success and errors, and >0 on uncaught exceptions.
+This reduces the number of
+.Qq Delivery failed
+messages.
+.Sh SEE ALSO
+.Xr sotd.py 8
+.Sh AUTHORS
+.An Anna Aq Mt cyber@sysrq.in
+.Sh SECURITY CONSIDERATIONS
+Forged sender can make unauthorized changes to the database.
+Such attacks can be prevented by using spam filtering software with very strict SPF, DKIM and DMARC policy rules.

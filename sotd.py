@@ -85,6 +85,7 @@ def display_server_page(data, lang, feature_desc) -> None:
     print("--", end="\n\n")
     print(f"=> ./{data['name']} ⚓ Permanent link to this page")
     print("=> ./random 🔀 Random server")
+    print("=> ./list 📃 List all servers")
     print("=> ./info/README.gmi ℹ️ About this thing")
 
 
@@ -166,6 +167,15 @@ def sotd_info() -> None:
             print("=>", item.name, end="/\n" if item.is_dir() else "\n")
     else:
         raise Failure("Cannot display this file")
+
+@app.route("/list")
+def sotd_list() -> None:
+    """ List all enabled servers """
+    print("20 text/gemini\r\n")
+    print("# Gemini servers")
+    print()
+    for name in enabled_servers():
+        print(f"=> ../{name} {name}")
 
 @app.route("/")
 def sotd() -> None:

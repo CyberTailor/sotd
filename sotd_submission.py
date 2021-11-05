@@ -109,7 +109,7 @@ class BotHandler:
         """ Email address globs and names from the registry file """
         reg = []
         for line in Path(self.dataroot / "registry").open():
-            parts = line.split()
+            parts = list(filter(None, line.split()))
             if len(parts) == 3 and parts[0] == "#":  # contains false positives
                 reg.append(RegistryEntry(parts[1], parts[2], enabled=False))
             elif len(parts) == 2:

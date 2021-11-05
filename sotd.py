@@ -40,16 +40,17 @@ class NotFound(RuntimeError):
     pass
 
 
-def is_enabled(name: str) -> bool:
-    registry = app.dataroot / "registry"
-    for line in registry.open():
-        line = line.strip()
-        if line.startswith("#") or not line:
+def enabled_servers() -> list[str]:
+    names = []
+    for line in Path(app.dataroot / "registry").open():
+        parts = list(filter(None, line.split()))
+        if len(parts) != 2 or parts[0].startswith("#"):
             continue
-        if name == line.split()[-1]:  # matching entry found
-            return True
+        if parts[1] not in names:
+            names.append(parts[1])
 
-    return False
+    names.sort()
+    return names
 
 
 def display_server_page(data, lang, feature_desc) -> None:
@@ -185,22 +186,21 @@ def sotd_server_page(is_random: bool = False) -> None:
     if len(Path(app.path).parts) > 2:
         raise NotFound("UFO landed and left these words here")
 
+    if is_random:
+        name = random.choice(enabled_servers())
+    else:
+        name = Path(app.path).parts[1]
+        if name not in enabled_servers():
+            raise NotFound("No appropriate server info found")
+
     con = sqlite3.connect(app.dataroot / "sotd.db")
     con.row_factory = sqlite3.Row
     cur = con.cursor()
 
-    if is_random:
-        cur.execute("SELECT * FROM servers")
-        data = random.choice(cur.fetchall())
-    else:
-        cur.execute("SELECT * FROM servers "
-                    "WHERE name=?", (Path(app.path).parts[1],))
-        data = cur.fetchone()
-        if data is None:
-            raise NotFound("No server info found")
-
-    if not is_enabled(data["name"]):
-        raise Failure("Server info came from non-authorized source")
+    cur.execute("SELECT * FROM servers WHERE name=?", (name,))
+    data = cur.fetchone()
+    if data is None:
+        raise NotFound("No server info found")
 
     lang_name = None
     if data["lang"] is not None:

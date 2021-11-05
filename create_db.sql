@@ -23,7 +23,7 @@ CREATE TABLE languages(
 
 CREATE TABLE servers(
 	/* Short name for URLs and email submissions */
-	name PRIMARY_KEY,
+	name PRIMARY KEY,
 
 	/* Official name. If it's NULL, `name` is used instead */
 	screen_name,

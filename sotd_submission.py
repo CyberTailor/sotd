@@ -304,8 +304,7 @@ if __name__ == "__main__":
     connection = sqlite3.connect(dataroot / "sotd.db")
     connection.row_factory = sqlite3.Row
     cursor = connection.cursor()
-    # FIXME: foreign key mismatch - "server_features" referencing "servers"
-    # cursor.execute("PRAGMA foreign_keys = ON")
+    cursor.execute("PRAGMA foreign_keys = ON")
 
     try:
         bot.auth()

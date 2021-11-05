@@ -8,6 +8,7 @@ import mimetypes
 import os
 import random
 import sqlite3
+import sys
 import urllib.parse
 
 from collections import OrderedDict
@@ -148,9 +149,11 @@ def sotd_info() -> None:
     if path.is_file():
         mimetypes.add_type("text/gemini", ".gmi")
         mimetypes.add_type("text/gemini", ".gemini")
-        print("20", mimetypes.guess_type(path, strict=False)[0] or "text/plain",
-              end="\r\n")
-        print(path.read_text())
+        mimetypes.add_type("application/x-sqlite3", ".db")
+        mime = mimetypes.guess_type(path, strict=False)[0] or "text/plain"
+        response = bytes(f"20 {mime}\r\n", encoding="utf-8")
+        response += path.read_bytes()
+        sys.stdout.buffer.write(response)
     elif path.is_dir():
         if not app.path.endswith("/"):
             raise Redirect(app.path + "/")

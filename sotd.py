@@ -97,7 +97,9 @@ class CGIHandler:
     @cached_property
     def path(self) -> str:
         path_info = os.getenv("PATH_INFO", default="/")
-        return urllib.parse.unquote(path_info) or "/"
+        path_info = urllib.parse.unquote(path_info) or "/"
+        # resolve paths like /./random for dumb clients
+        return str(Path(path_info).resolve())
 
     @cached_property
     def script_name(self) -> str:
